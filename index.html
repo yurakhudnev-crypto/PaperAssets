@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Paper Maker Asset Generator</title>
+    <style>
+        :root { --bg-primary: #1a1a2e; --bg-secondary: #16213e; --bg-tertiary: #0f3460; --accent: #e94560; --accent-hover: #ff6b6b; --text-primary: #eee; --text-secondary: #aaa; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; }
+        header { background: var(--bg-secondary); padding: 20px; text-align: center; border-bottom: 3px solid var(--accent); }
+        header h1 { color: var(--accent); margin-bottom: 5px; }
+        .main-container { display: grid; grid-template-columns: 300px 1fr 280px; gap: 20px; padding: 20px; max-width: 1600px; margin: 0 auto; }
+        .panel { background: var(--bg-secondary); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); max-height: calc(100vh - 140px); overflow-y: auto; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 15px; flex-wrap: wrap; }
+        .tab-btn { flex: 1; padding: 8px; background: var(--bg-tertiary); border: none; border-radius: 5px; color: var(--text-primary); cursor: pointer; transition: 0.3s; font-size: 13px; }
+        .tab-btn.active, .tab-btn:hover { background: var(--accent); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: block; margin-bottom: 4px; font-size: 13px; color: var(--text-secondary); }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 2px solid var(--bg-tertiary); border-radius: 5px; background: var(--bg-primary); color: var(--text-primary); }
+        input[type="color"] { width: 100%; height: 36px; border: none; border-radius: 5px; cursor: pointer; background: var(--bg-primary); }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+        .checkbox-group input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+        .checkbox-group label { cursor: pointer; font-size: 13px; margin: 0; }
+        button { cursor: pointer; font-family: inherit; }
+        .btn-primary { width: 100%; padding: 10px; margin: 5px 0; border: none; border-radius: 5px; background: var(--accent); color: white; font-weight: 600; transition: 0.3s; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-secondary { width: 100%; padding: 8px; margin: 5px 0; border: 2px solid var(--bg-tertiary); border-radius: 5px; background: transparent; color: var(--text-primary); transition: 0.3s; }
+        .btn-secondary:hover { background: var(--bg-tertiary); border-color: var(--accent); }
+        .tools-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 10px 0; }
+        .tool-btn { padding: 8px; background: var(--bg-tertiary); border: 2px solid transparent; border-radius: 5px; color: var(--text-primary); font-size: 16px; transition: 0.2s; }
+        .tool-btn.active { border-color: var(--accent); background: var(--bg-primary); }
+        .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 10px 0; }
+        .palette-color { width: 100%; aspect-ratio: 1; border: 2px solid transparent; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .palette-color:hover { transform: scale(1.1); }
+        .palette-color.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+        .canvas-area { background: var(--bg-secondary); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .canvas-toolbar { display: flex; gap: 10px; margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 5px; align-items: center; }
+        .canvas-toolbar button { padding: 5px 10px; background: var(--bg-primary); border: none; border-radius: 3px; color: var(--text-primary); }
+        .canvas-toolbar button.active { background: var(--accent); }
+        #zoomLevel { flex: 1; text-align: center; font-weight: bold; }
+        .canvas-wrapper { flex: 1; display: flex; justify-content: center; align-items: center; background: var(--bg-primary); border-radius: 5px; overflow: auto; min-height: 400px; position: relative; }
+        #mainCanvas { border: 2px solid var(--bg-tertiary); border-radius: 5px; image-rendering: pixelated; image-rendering: crisp-edges; background: linear-gradient(45deg, #0a0a0a 25%, transparent 25%), linear-gradient(-45deg, #0a0a0a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0a0a0a 75%), linear-gradient(-45deg, transparent 75%, #0a0a0a 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); cursor: crosshair; }
+        .canvas-info { display: flex; justify-content: space-between; margin-top: 10px; padding: 8px; background: var(--bg-tertiary); border-radius: 5px; font-size: 12px; }
+        .canvas-info strong { color: var(--accent); margin-left: 4px; }
+        .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; margin-bottom: 15px; }
+        .preview-item { background: var(--bg-tertiary); border-radius: 5px; padding: 4px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .preview-item:hover { transform: scale(1.05); }
+        .preview-item canvas { width: 100%; image-rendering: pixelated; border-radius: 3px; }
+        .preview-item span { display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+        .info-panel { background: var(--bg-tertiary); padding: 12px; border-radius: 5px; font-size: 13px; line-height: 1.8; }
+        .stat-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg-primary); font-size: 13px; }
+        .stat-value { color: var(--accent); font-weight: bold; }
+        footer { background: var(--bg-secondary); padding: 15px; text-align: center; border-top: 2px solid var(--bg-tertiary); margin-top: 20px; font-size: 13px; }
+        @media (max-width: 1100px) { .main-container { grid-template-columns: 1fr; } .panel { max-height: none; } }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎮 RPG Paper Maker Asset Generator</h1>
+        <p style="color: var(--text-secondary); font-size: 14px;">Генератор 2D и 3D пиксельных ассетов</p>
+    </header>
+
+    <div class="main-container">
+        <!-- Left Panel -->
+        <aside class="panel">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="generate">Генерация</button>
+                <button class="tab-btn" data-tab="3d">🎲 3D Объекты</button>
+                <button class="tab-btn" data-tab="edit">✏️ Редактор</button>
+                <button class="tab-btn" data-tab="export">💾 Экспорт</button>
+            </div>
+
+            <div id="generate-tab" class="tab-content active">
+                <div class="control-group">
+                    <label>Тип ассета</label>
+                    <select id="assetType">
+                        <option value="tile">Тайл (32x32)</option>
+                        <option value="character">Персонаж (32x48)</option>
+                        <option value="object">Объект (32x32)</option>
+                        <option value="tree">Дерево (96x96)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Основной цвет</label>
+                    <input type="color" id="mainColor" value="#2d5a27">
+                </div>
+                <div class="control-group">
+                    <label>Вторичный цвет</label>
+                    <input type="color" id="secondaryColor" value="#4a7c43">
+                </div>
+                <div class="control-group">
+                    <label>Вариантов: <span id="variantValue">4</span></label>
+                    <input type="range" id="variantCount" min="1" max="16" value="4">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="addShadows" checked>
+                    <label>Добавить тени</label>
+                </div>
+                <button class="btn-primary" onclick="app.generateAssets()">🎨 Сгенерировать</button>
+                <button class="btn-secondary" onclick="app.randomizeColors()">🎲 Случайные цвета</button>
+            </div>
+
+            <div id="3d-tab" class="tab-content">
+                <div class="control-group">
+                    <label>Тип 3D объекта</label>
+                    <select id="object3dType">
+                        <option value="chest">Сундук</option>
+                        <option value="barrel">Бочка</option>
+                        <option value="pot">Горшок</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Цвет материала</label>
+                    <input type="color" id="materialColor" value="#8B4513">
+                </div>
+                <div class="control-group">
+                    <label>Цвет деталей</label>
+                    <input type="color" id="detailColor3d" value="#FFD700">
+                </div>
+                <div class="control-group">
+                    <label>Разрешение</label>
+                    <select id="textureResolution">
+                        <option value="64">64x64</option>
+                        <option value="128">128x128</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="app.generate3DObject()">📦 Сгенерировать 3D</button>
+            </div>
+
+            <div id="edit-tab" class="tab-content">
+                <div class="tools-grid">
+                    <button class="tool-btn active" data-tool="pencil">✏️</button>
+                    <button class="tool-btn" data-tool="eraser">🧹</button>
+                    <button class="tool-btn" data-tool="fill">🪣</button>
+                    <button class="tool-btn" data-tool="picker">💧</button>
+                </div>
+                <div class="control-group">
+                    <label>Размер кисти: <span id="brushSizeValue">1</span></label>
+                    <input type="range" id="brushSize" min="1" max="8" value="1">
+                </div>
+                <div class="control-group">
+                    <label>Палитра</label>
+                    <div class="palette" id="palette"></div>
+                </div>
+                <div class="control-group">
+                    <label>Текущий цвет</label>
+                    <input type="color" id="currentColor" value="#2d5a27">
+                </div>
+                <button class="btn-secondary" onclick="app.undo()">↩️ Отменить</button>
+                <button class="btn-secondary" onclick="app.clearCanvas()">🗑️ Очистить</button>
+            </div>
+
+            <div id="export-tab" class="tab-content">
+                <div class="control-group">
+                    <label>Имя файла</label>
+                    <input type="text" id="fileName" value="rpg-assets">
+                </div>
+                <div class="control-group">
+                    <label>Масштаб</label>
+                    <select id="exportScale">
+                        <option value="1">1x (Оригинал)</option>
+                        <option value="2">2x (Увеличить)</option>
+                        <option value="4">4x (HD)</option>
+                    </select>
+                </div>
+                <button class="btn-primary" onclick="app.exportPNG()">📥 Скачать PNG</button>
+                <button class="btn-secondary" onclick="app.copyToClipboard()">📋 Копировать в буфер</button>
+            </div>
+        </aside>
+
+        <!-- Center Canvas -->
+        <main class="canvas-area">
+            <div class="canvas-toolbar">
+                <button onclick="app.zoomOut()">➖</button>
+                <span id="zoomLevel">100%</span>
+                <button onclick="app.zoomIn()">➕</button>
+                <button onclick="app.toggleGrid()" id="gridBtn" class="active">Сетка</button>
+            </div>
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <canvas id="mainCanvas" width="512" height="512"></canvas>
+            </div>
+            <div class="canvas-info">
+                <span>Позиция: <strong id="cursorPos">0, 0</strong></span>
+                <span>Размер: <strong>512x512</strong></span>
+            </div>
+        </main>
+
+        <!-- Right Panel -->
+        <aside class="panel">
+            <h3 style="color: var(--accent); margin-bottom: 10px;">📋 Превью</h3>
+            <div id="previewContainer" class="preview-grid"></div>
+            
+            <h3 style="color: var(--accent); margin: 15px 0 10px;">ℹ️ Информация</h3>
+            <div class="info-panel" id="assetInfo">
+                <p>Сгенерируйте ассеты для просмотра информации</p>
+            </div>
+
+            <h3 style="color: var(--accent); margin: 15px 0 10px;">📊 Статистика</h3>
+            <div class="stat-item"><span>Всего ассетов:</span><span class="stat-value" id="totalAssets">0</span></div>
+            <div class="stat-item"><span>Уникальных цветов:</span><span class="stat-value" id="colorCount">0</span></div>
+        </aside>
+    </div>
+
+    <footer>
+        <p>RPG Paper Maker Asset Generator | Работает полностью в браузере</p>
+    </footer>
+
+    <script>
+        // === UTILS ===
+        const Utils = {
+            lightenColor: (color, percent) => {
+                const num = parseInt(color.replace('#', ''), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = Math.min(255, (num >> 16) + amt);
+                const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+                const B = Math.min(255, (num & 0x0000FF) + amt);
+                return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+            },
+            darkenColor: (color, percent) => {
+                const num = parseInt(color.replace('#', ''), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = Math.max(0, (num >> 16) - amt);
+                const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
+                const B = Math.max(0, (num & 0x0000FF) - amt);
+                return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+            }
+        };
+
+        // === EDITOR ===
+        class PixelEditor {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+                this.currentColor = '#2d5a27';
+                this.brushSize = 1;
+                this.isDrawing = false;
+                this.history = [];
+                this.historyStep = -1;
+            }
+            init() {
+                this.canvas.addEventListener('mousedown', e => this.startDrawing(e));
+                this.canvas.addEventListener('mousemove', e => this.draw(e));
+                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+                this.canvas.addEventListener('mouseout', () => this.stopDrawing());
+                this.saveState();
+            }
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const scaleX = this.canvas.width / rect.width;
+                const scaleY = this.canvas.height / rect.height;
+                return {
+                    x: Math.floor((e.clientX - rect.left) * scaleX),
+                    y: Math.floor((e.clientY - rect.top) * scaleY)
+                };
+            }
+            startDrawing(e) {
+                this.isDrawing = true;
+                const pos = this.getMousePos(e);
+                this.lastX = pos.x;
+                this.lastY = pos.y;
+                this.drawPixel(pos.x, pos.y);
+            }
+            draw(e) {
+                if (!this.isDrawing) return;
+                const pos = this.getMousePos(e);
+                this.drawLine(this.lastX, this.lastY, pos.x, pos.y);
+                this.lastX = pos.x;
+                this.lastY = pos.y;
+            }
+            stopDrawing() {
+                if (this.isDrawing) { this.isDrawing = false; this.saveState(); }
+            }
+            drawPixel(x, y) {
+                this.ctx.fillStyle = this.currentColor;
+                this.ctx.fillRect(x, y, this.brushSize, this.brushSize);
+            }
+            drawLine(x0, y0, x1, y1) {
+                const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+                const sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
+                let err = dx - dy;
+                while (true) {
+                    this.drawPixel(x0, y0);
+                    if (x0 === x1 && y0 === y1) break;
+                    const e2 = 2 * err;
+                    if (e2 > -dy) { err -= dy; x0 += sx; }
+                    if (e2 < dx) { err += dx; y0 += sy; }
+                }
+            }
+            setColor(c) { this.currentColor = c; }
+            setBrushSize(s) { this.brushSize = s; }
+            clear() { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.saveState(); }
+            saveState() {
+                this.historyStep++;
+                if (this.historyStep < this.history.length) this.history.length = this.historyStep;
+                this.history.push(this.canvas.toDataURL());
+                if (this.history.length > 30) { this.history.shift(); this.historyStep--; }
+            }
+            undo() {
+                if (this.historyStep > 0) { this.historyStep--; this.restoreState(); }
+            }
+            restoreState() {
+                const img = new Image();
+                img.src = this.history[this.historyStep];
+                img.onload = () => { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.ctx.drawImage(img, 0, 0); };
+            }
+        }
+
+        // === GENERATORS ===
+        class TileGenerator {
+            generate(opts) {
+                const assets = [];
+                for (let i = 0; i < opts.count; i++) {
+                    const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+                    const ctx = c.getContext('2d');
+                    const type = i % 4;
+                    ctx.fillStyle = opts.mainColor; ctx.fillRect(0, 0, 32, 32);
+                    if (type === 0) { // Grass
+                        ctx.fillStyle = Utils.lightenColor(opts.mainColor, 15);
+                        for(let j=0; j<8; j++) ctx.fillRect(Math.random()*28, Math.random()*28, 2, 3);
+                    } else if (type === 1) { // Dirt
+                        ctx.fillStyle = opts.secondaryColor; ctx.fillRect(0,0,32,32);
+                        ctx.fillStyle = Utils.darkenColor(opts.secondaryColor, 10);
+                        for(let j=0; j<10; j++) ctx.fillRect(Math.random()*28, Math.random()*28, 3, 3);
+                    } else if (type === 2) { // Stone
+                        ctx.fillStyle = '#7a7a7a'; ctx.fillRect(0,0,32,32);
+                        ctx.fillStyle = '#999'; ctx.fillRect(4,4,10,10); ctx.fillRect(18,18,10,10);
+                    } else { // Water
+                        ctx.fillStyle = '#4169E1'; ctx.fillRect(0,0,32,32);
+                        ctx.fillStyle = '#6a89cc'; ctx.fillRect(4,8,8,2); ctx.fillRect(20,20,8,2);
+                    }
+                    if (opts.shadows) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0, 28, 32, 4); }
+                    assets.push({ type: 'tile', width: 32, height: 32, data: ctx.getImageData(0,0,32,32) });
+                }
+                return assets;
+            }
+        }
+
+        class CharacterGenerator {
+            generate(opts) {
+                const c = document.createElement('canvas'); c.width = 32; c.height = 48;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = opts.secondaryColor; ctx.fillRect(8, 20, 16, 20); // Body
+                ctx.fillStyle = Utils.lightenColor(opts.mainColor, 20); ctx.fillRect(8, 4, 16, 16); // Head
+                ctx.fillStyle = '#000'; ctx.fillRect(11, 10, 3, 3); ctx.fillRect(18, 10, 3, 3); // Eyes
+                ctx.fillStyle = opts.mainColor; ctx.fillRect(8, 40, 6, 8); ctx.fillRect(18, 40, 6, 8); // Legs
+                return [{ type: 'character', width: 32, height: 48, data: ctx.getImageData(0,0,32,48) }];
+            }
+        }
+
+        class ObjectGenerator {
+            generate(opts) {
+                const assets = [];
+                for (let i = 0; i < opts.count; i++) {
+                    const c = document.createElement('canvas'); c.width = 32; c.height = 32;
+                    const ctx = c.getContext('2d');
+                    const obj = i % 3;
+                    if (obj === 0) { // Chest
+                        ctx.fillStyle = '#8B4513'; ctx.fillRect(2, 12, 28, 18);
+                        ctx.fillStyle = '#A0522D'; ctx.fillRect(2, 8, 28, 8);
+                        ctx.fillStyle = '#FFD700'; ctx.fillRect(14, 18, 4, 4);
+                    } else if (obj === 1) { // Barrel
+                        ctx.fillStyle = '#8B4513'; ctx.fillRect(6, 4, 20, 26);
+                        ctx.fillStyle = '#555'; ctx.fillRect(6, 10, 20, 3); ctx.fillRect(6, 20, 20, 3);
+                    } else { // Pot
+                        ctx.fillStyle = '#A0522D'; ctx.fillRect(8, 12, 16, 16);
+                        ctx.fillRect(6, 8, 20, 6);
+                    }
+                    assets.push({ type: 'object', width: 32, height: 32, data: ctx.getImageData(0,0,32,32) });
+                }
+                return assets;
+            }
+        }
+
+        class Generator3D {
+            generate(opts) {
+                const assets = [];
+                const res = parseInt(opts.resolution);
+                const views = ['top', 'front', 'side'];
+                views.forEach(view => {
+                    const c = document.createElement('canvas'); c.width = res; c.height = res;
+                    const ctx = c.getContext('2d');
+                    ctx.fillStyle = opts.materialColor; ctx.fillRect(0, 0, res, res);
+                    // Add simple 3D projection details based on view
+                    ctx.fillStyle = Utils.darkenColor(opts.materialColor, 15);
+                    if (view === 'top') {
+                        ctx.fillRect(res*0.2, res*0.2, res*0.6, res*0.6);
+                        ctx.fillStyle = opts.detailColor; ctx.fillRect(res*0.45, res*0.45, res*0.1, res*0.1);
+                    } else if (view === 'front') {
+                        ctx.fillRect(res*0.1, res*0.3, res*0.8, res*0.6);
+                        ctx.fillStyle = opts.detailColor; ctx.fillRect(res*0.4, res*0.5, res*0.2, res*0.15);
+                    } else {
+                        ctx.fillRect(res*0.3, res*0.3, res*0.4, res*0.6);
+                    }
+                    assets.push({ type: '3d_'+opts.type, view, width: res, height: res, data: ctx.getImageData(0,0,res,res) });
+                });
+                return assets;
+            }
+        }
+
+        // === MAIN APP ===
+        class RPGAssetGenerator {
+            constructor() {
+                this.canvas = document.getElementById('mainCanvas');
+                this.editor = new PixelEditor(this.canvas);
+                this.generators = {
+                    tile: new TileGenerator(),
+                    character: new CharacterGenerator(),
+                    object: new ObjectGenerator(),
+                    '3d': new Generator3D()
+                };
+                this.state = { zoom: 1, showGrid: true, assets: [] };
+                this.init();
+            }
+            init() {
+                this.editor.init();
+                this.setupUI();
+                this.setupPalette();
+                this.drawGrid();
+            }
+            setupUI() {
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                        btn.classList.add('active');
+                        document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+                    });
+                });
+                document.querySelectorAll('.tool-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    });
+                });
+                document.getElementById('variantCount').addEventListener('input', e => {
+                    document.getElementById('variantValue').textContent = e.target.value;
+                });
+                document.getElementById('brushSize').addEventListener('input', e => {
+                    document.getElementById('brushSizeValue').textContent = e.target.value;
+                    this.editor.setBrushSize(parseInt(e.target.value));
+                });
+                document.getElementById('currentColor').addEventListener('input', e => {
+                    this.editor.setColor(e.target.value);
+                });
+                this.canvas.addEventListener('mousemove', e => {
+                    const pos = this.editor.getMousePos(e);
+                    document.getElementById('cursorPos').textContent = `${pos.x}, ${pos.y}`;
+                });
+            }
+            setupPalette() {
+                const colors = ['#1a1a2e', '#0f3460', '#2d5a27', '#4a7c43', '#8fbc6f', '#e94560', '#ff6b6b', '#f7d794', '#778baf', '#fff', '#000', '#8B4513'];
+                const container = document.getElementById('palette');
+                colors.forEach((c, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'palette-color' + (i === 2 ? ' active' : '');
+                    div.style.backgroundColor = c;
+                    div.addEventListener('click', () => {
+                        document.querySelectorAll('.palette-color').forEach(x => x.classList.remove('active'));
+                        div.classList.add('active');
+                        this.editor.setColor(c);
+                        document.getElementById('currentColor').value = c;
+                    });
+                    container.appendChild(div);
+                });
+            }
+            generateAssets() {
+                const type = document.getElementById('assetType').value;
+                const opts = {
+                    mainColor: document.getElementById('mainColor').value,
+                    secondaryColor: document.getElementById('secondaryColor').value,
+                    count: parseInt(document.getElementById('variantCount').value),
+                    shadows: document.getElementById('addShadows').checked
+                };
+                this.editor.clear();
+                this.state.assets = this.generators[type].generate(opts);
+                this.renderAssets(this.state.assets);
+                this.updateInfo(type, this.state.assets.length);
+            }
+            generate3DObject() {
+                const opts = {
+                    type: document.getElementById('object3dType').value,
+                    materialColor: document.getElementById('materialColor').value,
+                    detailColor: document.getElementById('detailColor3d').value,
+                    resolution: document.getElementById('textureResolution').value
+                };
+                this.editor.clear();
+                this.state.assets = this.generators['3d'].generate(opts);
+                this.render3DAssets(this.state.assets);
+                this.updateInfo('3d (' + opts.type + ')', this.state.assets.length);
+            }
+            renderAssets(assets) {
+                const cols = 4;
+                assets.forEach((asset, i) => {
+                    const col = i % cols, row = Math.floor(i / cols);
+                    this.ctx.putImageData(asset.data, col * 40 + 8, row * 40 + 8);
+                });
+                this.editor.saveState();
+                this.updatePreview();
+            }
+            render3DAssets(assets) {
+                assets.forEach((asset, i) => {
+                    this.ctx.putImageData(asset.data, i * 140 + 10, 10);
+                });
+                this.editor.saveState();
+                this.updatePreview();
+            }
+            updatePreview() {
+                const container = document.getElementById('previewContainer');
+                container.innerHTML = '';
+                this.state.assets.forEach((asset, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'preview-item';
+                    const c = document.createElement('canvas');
+                    c.width = asset.width; c.height = asset.height;
+                    c.getContext('2d').putImageData(asset.data, 0, 0);
+                    const span = document.createElement('span');
+                    span.textContent = asset.type + (asset.view ? ` ${asset.view}` : '');
+                    div.appendChild(c); div.appendChild(span);
+                    container.appendChild(div);
+                });
+            }
+            updateInfo(type, count) {
+                document.getElementById('assetInfo').innerHTML = `<strong>Тип:</strong> ${type}<br><strong>Количество:</strong> ${count}<br><strong>Формат:</strong> PNG с прозрачностью`;
+                document.getElementById('totalAssets').textContent = count;
+                document.getElementById('colorCount').textContent = 'Готово';
+            }
+            drawGrid() {
+                if (!this.state.showGrid) return;
+                this.ctx.strokeStyle = 'rgba(255,255,255,0.1)'; this.ctx.lineWidth = 1;
+                for (let x = 0; x <= 512; x += 32) { this.ctx.beginPath(); this.ctx.moveTo(x, 0); this.ctx.lineTo(x, 512); this.ctx.stroke(); }
+                for (let y = 0; y <= 512; y += 32) { this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(512, y); this.ctx.stroke(); }
+            }
+            toggleGrid() {
+                this.state.showGrid = !this.state.showGrid;
+                document.getElementById('gridBtn').classList.toggle('active');
+                this.editor.clear();
+                if (this.state.assets.length > 0) this.renderAssets(this.state.assets);
+                else this.drawGrid();
+            }
+            zoomIn() { this.state.zoom = Math.min(this.state.zoom * 1.2, 4); this.applyZoom(); }
+            zoomOut() { this.state.zoom = Math.max(this.state.zoom / 1.2, 0.5); this.applyZoom(); }
+            applyZoom() {
+                this.canvas.style.transform = `scale(${this.state.zoom})`;
+                document.getElementById('zoomLevel').textContent = Math.round(this.state.zoom * 100) + '%';
+            }
+            undo() { this.editor.undo(); }
+            clearCanvas() { this.editor.clear(); this.drawGrid(); this.state.assets = []; document.getElementById('previewContainer').innerHTML = ''; }
+            randomizeColors() {
+                const r = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+                document.getElementById('mainColor').value = r();
+                document.getElementById('secondaryColor').value = r();
+            }
+            exportPNG() {
+                const name = document.getElementById('fileName').value || 'assets';
+                const scale = parseInt(document.getElementById('exportScale').value);
+                if (scale > 1) {
+                    const tc = document.createElement('canvas'); tc.width = 512 * scale; tc.height = 512 * scale;
+                    const tctx = tc.getContext('2d'); tctx.imageSmoothingEnabled = false; tctx.scale(scale, scale);
+                    tctx.drawImage(this.canvas, 0, 0);
+                    this.download(tc, name + '.png');
+                } else {
+                    this.download(this.canvas, name + '.png');
+                }
+            }
+            download(canvasOrSource, filename) {
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = canvasOrSource.toDataURL ? canvasOrSource.toDataURL('image/png') : canvasOrSource;
+                link.click();
+            }
+            copyToClipboard() {
+                this.canvas.toBlob(blob => {
+                    navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(() => alert('Скопировано!'));
+                });
+            }
+        }
+
+        let app;
+        window.addEventListener('DOMContentLoaded', () => { app = new RPGAssetGenerator(); });
+    </script>
+</body>
+</html>
