@@ -231,357 +231,627 @@
             }
         };
 
-        // === EDITOR ===
-        class PixelEditor {
-            constructor(canvas) {
-                this.canvas = canvas;
-                this.ctx = canvas.getContext('2d', { willReadFrequently: true });
-                this.currentColor = '#2d5a27';
-                this.brushSize = 1;
-                this.isDrawing = false;
-                this.history = [];
-                this.historyStep = -1;
-            }
-            init() {
-                this.canvas.addEventListener('mousedown', e => this.startDrawing(e));
-                this.canvas.addEventListener('mousemove', e => this.draw(e));
-                this.canvas.addEventListener('mouseup', () => this.stopDrawing());
-                this.canvas.addEventListener('mouseout', () => this.stopDrawing());
-                this.saveState();
-            }
-            getMousePos(e) {
-                const rect = this.canvas.getBoundingClientRect();
-                const scaleX = this.canvas.width / rect.width;
-                const scaleY = this.canvas.height / rect.height;
-                return {
-                    x: Math.floor((e.clientX - rect.left) * scaleX),
-                    y: Math.floor((e.clientY - rect.top) * scaleY)
-                };
-            }
-            startDrawing(e) {
-                this.isDrawing = true;
-                const pos = this.getMousePos(e);
-                this.lastX = pos.x;
-                this.lastY = pos.y;
-                this.drawPixel(pos.x, pos.y);
-            }
-            draw(e) {
-                if (!this.isDrawing) return;
-                const pos = this.getMousePos(e);
-                this.drawLine(this.lastX, this.lastY, pos.x, pos.y);
-                this.lastX = pos.x;
-                this.lastY = pos.y;
-            }
-            stopDrawing() {
-                if (this.isDrawing) { this.isDrawing = false; this.saveState(); }
-            }
-            drawPixel(x, y) {
-                this.ctx.fillStyle = this.currentColor;
-                this.ctx.fillRect(x, y, this.brushSize, this.brushSize);
-            }
-            drawLine(x0, y0, x1, y1) {
-                const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-                const sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
-                let err = dx - dy;
-                while (true) {
-                    this.drawPixel(x0, y0);
-                    if (x0 === x1 && y0 === y1) break;
-                    const e2 = 2 * err;
-                    if (e2 > -dy) { err -= dy; x0 += sx; }
-                    if (e2 < dx) { err += dx; y0 += sy; }
+       <script>
+// === UTILS ===
+const Utils = {
+    lightenColor: (color, percent) => {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.min(255, (num >> 16) + amt);
+        const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+        const B = Math.min(255, (num & 0x0000FF) + amt);
+        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+    },
+    darkenColor: (color, percent) => {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max(0, (num >> 16) - amt);
+        const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
+        const B = Math.max(0, (num & 0x0000FF) - amt);
+        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+    },
+    randomInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+};
+
+// === EDITOR ===
+class PixelEditor {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d', { willReadFrequently: true });
+        this.currentColor = '#2d5a27';
+        this.brushSize = 1;
+        this.isDrawing = false;
+        this.history = [];
+        this.historyStep = -1;
+    }
+    
+    init() {
+        this.canvas.addEventListener('mousedown', e => this.startDrawing(e));
+        this.canvas.addEventListener('mousemove', e => this.draw(e));
+        this.canvas.addEventListener('mouseup', () => this.stopDrawing());
+        this.canvas.addEventListener('mouseout', () => this.stopDrawing());
+        this.saveState();
+    }
+    
+    getMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        return {
+            x: Math.floor((e.clientX - rect.left) * scaleX),
+            y: Math.floor((e.clientY - rect.top) * scaleY)
+        };
+    }
+    
+    startDrawing(e) {
+        this.isDrawing = true;
+        const pos = this.getMousePos(e);
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+        this.drawPixel(pos.x, pos.y);
+    }
+    
+    draw(e) {
+        if (!this.isDrawing) return;
+        const pos = this.getMousePos(e);
+        this.drawLine(this.lastX, this.lastY, pos.x, pos.y);
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+    }
+    
+    stopDrawing() {
+        if (this.isDrawing) {
+            this.isDrawing = false;
+            this.saveState();
+        }
+    }
+    
+    drawPixel(x, y) {
+        this.ctx.fillStyle = this.currentColor;
+        this.ctx.fillRect(x, y, this.brushSize, this.brushSize);
+    }
+    
+    drawLine(x0, y0, x1, y1) {
+        const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+        const sx = (x0 < x1) ? 1 : -1, sy = (y0 < y1) ? 1 : -1;
+        let err = dx - dy;
+        while (true) {
+            this.drawPixel(x0, y0);
+            if (x0 === x1 && y0 === y1) break;
+            const e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; x0 += sx; }
+            if (e2 < dx) { err += dx; y0 += sy; }
+        }
+    }
+    
+    setColor(c) { this.currentColor = c; }
+    setBrushSize(s) { this.brushSize = s; }
+    
+    clear() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.saveState();
+    }
+    
+    saveState() {
+        this.historyStep++;
+        if (this.historyStep < this.history.length) this.history.length = this.historyStep;
+        this.history.push(this.canvas.toDataURL());
+        if (this.history.length > 30) { this.history.shift(); this.historyStep--; }
+    }
+    
+    undo() {
+        if (this.historyStep > 0) { this.historyStep--; this.restoreState(); }
+    }
+    
+    restoreState() {
+        const img = new Image();
+        img.src = this.history[this.historyStep];
+        img.onload = () => {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.drawImage(img, 0, 0);
+        };
+    }
+}
+
+// === GENERATORS ===
+class TileGenerator {
+    generate(opts) {
+        console.log('Generating tiles:', opts);
+        const assets = [];
+        
+        for (let i = 0; i < opts.count; i++) {
+            const c = document.createElement('canvas');
+            c.width = 32;
+            c.height = 32;
+            const ctx = c.getContext('2d');
+            const type = i % 4;
+            
+            // Base fill
+            ctx.fillStyle = opts.mainColor;
+            ctx.fillRect(0, 0, 32, 32);
+            
+            if (type === 0) { // Grass
+                ctx.fillStyle = Utils.lightenColor(opts.mainColor, 15);
+                for(let j = 0; j < 12; j++) {
+                    const x = Utils.randomInt(0, 28);
+                    const y = Utils.randomInt(0, 28);
+                    ctx.fillRect(x, y, 2, 3);
+                    ctx.fillRect(x + 1, y - 1, 2, 2);
+                }
+            } else if (type === 1) { // Dirt
+                ctx.fillStyle = opts.secondaryColor;
+                ctx.fillRect(0, 0, 32, 32);
+                ctx.fillStyle = Utils.darkenColor(opts.secondaryColor, 15);
+                for(let j = 0; j < 15; j++) {
+                    ctx.fillRect(Utils.randomInt(0, 28), Utils.randomInt(0, 28), 3, 3);
+                }
+            } else if (type === 2) { // Stone
+                ctx.fillStyle = '#7a7a7a';
+                ctx.fillRect(0, 0, 32, 32);
+                ctx.fillStyle = '#999';
+                ctx.fillRect(4, 4, 10, 10);
+                ctx.fillRect(18, 18, 10, 10);
+                ctx.fillStyle = '#666';
+                ctx.fillRect(8, 8, 2, 2);
+                ctx.fillRect(22, 22, 2, 2);
+            } else { // Water
+                ctx.fillStyle = '#4169E1';
+                ctx.fillRect(0, 0, 32, 32);
+                ctx.fillStyle = '#6a89cc';
+                for(let j = 0; j < 4; j++) {
+                    ctx.fillRect(4 + j * 7, 8 + (j % 2) * 12, 6, 2);
                 }
             }
-            setColor(c) { this.currentColor = c; }
-            setBrushSize(s) { this.brushSize = s; }
-            clear() { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.saveState(); }
-            saveState() {
-                this.historyStep++;
-                if (this.historyStep < this.history.length) this.history.length = this.historyStep;
-                this.history.push(this.canvas.toDataURL());
-                if (this.history.length > 30) { this.history.shift(); this.historyStep--; }
+            
+            if (opts.shadows) {
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(0, 28, 32, 4);
             }
-            undo() {
-                if (this.historyStep > 0) { this.historyStep--; this.restoreState(); }
-            }
-            restoreState() {
-                const img = new Image();
-                img.src = this.history[this.historyStep];
-                img.onload = () => { this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); this.ctx.drawImage(img, 0, 0); };
-            }
+            
+            assets.push({
+                type: 'tile',
+                subtype: ['grass', 'dirt', 'stone', 'water'][type],
+                width: 32,
+                height: 32,
+                data: ctx.getImageData(0, 0, 32, 32)
+            });
         }
+        
+        console.log('Generated', assets.length, 'tiles');
+        return assets;
+    }
+}
 
-        // === GENERATORS ===
-        class TileGenerator {
-            generate(opts) {
-                const assets = [];
-                for (let i = 0; i < opts.count; i++) {
-                    const c = document.createElement('canvas'); c.width = 32; c.height = 32;
-                    const ctx = c.getContext('2d');
-                    const type = i % 4;
-                    ctx.fillStyle = opts.mainColor; ctx.fillRect(0, 0, 32, 32);
-                    if (type === 0) { // Grass
-                        ctx.fillStyle = Utils.lightenColor(opts.mainColor, 15);
-                        for(let j=0; j<8; j++) ctx.fillRect(Math.random()*28, Math.random()*28, 2, 3);
-                    } else if (type === 1) { // Dirt
-                        ctx.fillStyle = opts.secondaryColor; ctx.fillRect(0,0,32,32);
-                        ctx.fillStyle = Utils.darkenColor(opts.secondaryColor, 10);
-                        for(let j=0; j<10; j++) ctx.fillRect(Math.random()*28, Math.random()*28, 3, 3);
-                    } else if (type === 2) { // Stone
-                        ctx.fillStyle = '#7a7a7a'; ctx.fillRect(0,0,32,32);
-                        ctx.fillStyle = '#999'; ctx.fillRect(4,4,10,10); ctx.fillRect(18,18,10,10);
-                    } else { // Water
-                        ctx.fillStyle = '#4169E1'; ctx.fillRect(0,0,32,32);
-                        ctx.fillStyle = '#6a89cc'; ctx.fillRect(4,8,8,2); ctx.fillRect(20,20,8,2);
-                    }
-                    if (opts.shadows) { ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0, 28, 32, 4); }
-                    assets.push({ type: 'tile', width: 32, height: 32, data: ctx.getImageData(0,0,32,32) });
-                }
-                return assets;
+class CharacterGenerator {
+    generate(opts) {
+        console.log('Generating character:', opts);
+        const c = document.createElement('canvas');
+        c.width = 32;
+        c.height = 48;
+        const ctx = c.getContext('2d');
+        
+        // Body
+        ctx.fillStyle = opts.secondaryColor;
+        ctx.fillRect(8, 20, 16, 20);
+        
+        // Head
+        ctx.fillStyle = Utils.lightenColor(opts.mainColor, 20);
+        ctx.fillRect(8, 4, 16, 16);
+        
+        // Eyes
+        ctx.fillStyle = '#000';
+        ctx.fillRect(11, 10, 3, 3);
+        ctx.fillRect(18, 10, 3, 3);
+        
+        // Legs
+        ctx.fillStyle = opts.mainColor;
+        ctx.fillRect(8, 40, 6, 8);
+        ctx.fillRect(18, 40, 6, 8);
+        
+        // Arms
+        ctx.fillRect(4, 22, 4, 14);
+        ctx.fillRect(24, 22, 4, 14);
+        
+        console.log('Generated character');
+        return [{
+            type: 'character',
+            width: 32,
+            height: 48,
+            data: ctx.getImageData(0, 0, 32, 48)
+        }];
+    }
+}
+
+class ObjectGenerator {
+    generate(opts) {
+        console.log('Generating objects:', opts);
+        const assets = [];
+        
+        for (let i = 0; i < opts.count; i++) {
+            const c = document.createElement('canvas');
+            c.width = 32;
+            c.height = 32;
+            const ctx = c.getContext('2d');
+            const obj = i % 3;
+            
+            if (obj === 0) { // Chest
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(2, 12, 28, 18);
+                ctx.fillStyle = '#A0522D';
+                ctx.fillRect(2, 8, 28, 8);
+                ctx.fillStyle = '#FFD700';
+                ctx.fillRect(14, 18, 4, 4);
+            } else if (obj === 1) { // Barrel
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(6, 4, 20, 26);
+                ctx.fillStyle = '#555';
+                ctx.fillRect(6, 10, 20, 3);
+                ctx.fillRect(6, 20, 20, 3);
+            } else { // Pot
+                ctx.fillStyle = '#A0522D';
+                ctx.fillRect(8, 12, 16, 16);
+                ctx.fillRect(6, 8, 20, 6);
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(10, 14, 12, 4);
             }
+            
+            assets.push({
+                type: 'object',
+                subtype: ['chest', 'barrel', 'pot'][obj],
+                width: 32,
+                height: 32,
+                data: ctx.getImageData(0, 0, 32, 32)
+            });
         }
+        
+        console.log('Generated', assets.length, 'objects');
+        return assets;
+    }
+}
 
-        class CharacterGenerator {
-            generate(opts) {
-                const c = document.createElement('canvas'); c.width = 32; c.height = 48;
-                const ctx = c.getContext('2d');
-                ctx.fillStyle = opts.secondaryColor; ctx.fillRect(8, 20, 16, 20); // Body
-                ctx.fillStyle = Utils.lightenColor(opts.mainColor, 20); ctx.fillRect(8, 4, 16, 16); // Head
-                ctx.fillStyle = '#000'; ctx.fillRect(11, 10, 3, 3); ctx.fillRect(18, 10, 3, 3); // Eyes
-                ctx.fillStyle = opts.mainColor; ctx.fillRect(8, 40, 6, 8); ctx.fillRect(18, 40, 6, 8); // Legs
-                return [{ type: 'character', width: 32, height: 48, data: ctx.getImageData(0,0,32,48) }];
+class Generator3D {
+    generate(opts) {
+        console.log('Generating 3D object:', opts);
+        const assets = [];
+        const res = parseInt(opts.resolution);
+        const views = ['top', 'front', 'side'];
+        
+        views.forEach(view => {
+            const c = document.createElement('canvas');
+            c.width = res;
+            c.height = res;
+            const ctx = c.getContext('2d');
+            
+            ctx.fillStyle = opts.materialColor;
+            ctx.fillRect(0, 0, res, res);
+            
+            ctx.fillStyle = Utils.darkenColor(opts.materialColor, 15);
+            
+            if (view === 'top') {
+                ctx.fillRect(res * 0.2, res * 0.2, res * 0.6, res * 0.6);
+                ctx.fillStyle = opts.detailColor;
+                ctx.fillRect(res * 0.45, res * 0.45, res * 0.1, res * 0.1);
+            } else if (view === 'front') {
+                ctx.fillRect(res * 0.1, res * 0.3, res * 0.8, res * 0.6);
+                ctx.fillStyle = opts.detailColor;
+                ctx.fillRect(res * 0.4, res * 0.5, res * 0.2, res * 0.15);
+            } else {
+                ctx.fillRect(res * 0.3, res * 0.3, res * 0.4, res * 0.6);
             }
+            
+            assets.push({
+                type: '3d_' + opts.type,
+                view: view,
+                width: res,
+                height: res,
+                data: ctx.getImageData(0, 0, res, res)
+            });
+        });
+        
+        console.log('Generated 3D assets:', assets.length);
+        return assets;
+    }
+}
+
+// === MAIN APP ===
+class RPGAssetGenerator {
+    constructor() {
+        this.canvas = document.getElementById('mainCanvas');
+        this.ctx = this.canvas.getContext('2d'); // ИСПРАВЛЕНО: добавлено
+        this.editor = new PixelEditor(this.canvas);
+        this.generators = {
+            tile: new TileGenerator(),
+            character: new CharacterGenerator(),
+            object: new ObjectGenerator(),
+            '3d': new Generator3D()
+        };
+        this.state = { zoom: 1, showGrid: true, assets: [] };
+        this.init();
+    }
+    
+    init() {
+        console.log('App initialized');
+        this.editor.init();
+        this.setupUI();
+        this.setupPalette();
+        this.drawGrid();
+    }
+    
+    setupUI() {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+            });
+        });
+        
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+        
+        document.getElementById('variantCount').addEventListener('input', e => {
+            document.getElementById('variantValue').textContent = e.target.value;
+        });
+        
+        document.getElementById('brushSize').addEventListener('input', e => {
+            document.getElementById('brushSizeValue').textContent = e.target.value;
+            this.editor.setBrushSize(parseInt(e.target.value));
+        });
+        
+        document.getElementById('currentColor').addEventListener('input', e => {
+            this.editor.setColor(e.target.value);
+        });
+        
+        this.canvas.addEventListener('mousemove', e => {
+            const pos = this.editor.getMousePos(e);
+            document.getElementById('cursorPos').textContent = `${pos.x}, ${pos.y}`;
+        });
+    }
+    
+    setupPalette() {
+        const colors = ['#1a1a2e', '#0f3460', '#2d5a27', '#4a7c43', '#8fbc6f', '#e94560', '#ff6b6b', '#f7d794', '#778baf', '#fff', '#000', '#8B4513'];
+        const container = document.getElementById('palette');
+        colors.forEach((c, i) => {
+            const div = document.createElement('div');
+            div.className = 'palette-color' + (i === 2 ? ' active' : '');
+            div.style.backgroundColor = c;
+            div.addEventListener('click', () => {
+                document.querySelectorAll('.palette-color').forEach(x => x.classList.remove('active'));
+                div.classList.add('active');
+                this.editor.setColor(c);
+                document.getElementById('currentColor').value = c;
+            });
+            container.appendChild(div);
+        });
+    }
+    
+    generateAssets() {
+        console.log('generateAssets called');
+        try {
+            const type = document.getElementById('assetType').value;
+            const opts = {
+                mainColor: document.getElementById('mainColor').value,
+                secondaryColor: document.getElementById('secondaryColor').value,
+                count: parseInt(document.getElementById('variantCount').value),
+                shadows: document.getElementById('addShadows').checked
+            };
+            
+            console.log('Options:', opts);
+            
+            this.editor.clear();
+            this.state.assets = this.generators[type].generate(opts);
+            
+            console.log('Generated assets:', this.state.assets);
+            
+            this.renderAssets(this.state.assets);
+            this.updateInfo(type, this.state.assets.length);
+        } catch (error) {
+            console.error('Generation error:', error);
+            alert('Ошибка генерации: ' + error.message);
         }
-
-        class ObjectGenerator {
-            generate(opts) {
-                const assets = [];
-                for (let i = 0; i < opts.count; i++) {
-                    const c = document.createElement('canvas'); c.width = 32; c.height = 32;
-                    const ctx = c.getContext('2d');
-                    const obj = i % 3;
-                    if (obj === 0) { // Chest
-                        ctx.fillStyle = '#8B4513'; ctx.fillRect(2, 12, 28, 18);
-                        ctx.fillStyle = '#A0522D'; ctx.fillRect(2, 8, 28, 8);
-                        ctx.fillStyle = '#FFD700'; ctx.fillRect(14, 18, 4, 4);
-                    } else if (obj === 1) { // Barrel
-                        ctx.fillStyle = '#8B4513'; ctx.fillRect(6, 4, 20, 26);
-                        ctx.fillStyle = '#555'; ctx.fillRect(6, 10, 20, 3); ctx.fillRect(6, 20, 20, 3);
-                    } else { // Pot
-                        ctx.fillStyle = '#A0522D'; ctx.fillRect(8, 12, 16, 16);
-                        ctx.fillRect(6, 8, 20, 6);
-                    }
-                    assets.push({ type: 'object', width: 32, height: 32, data: ctx.getImageData(0,0,32,32) });
-                }
-                return assets;
-            }
+    }
+    
+    generate3DObject() {
+        console.log('generate3DObject called');
+        try {
+            const opts = {
+                type: document.getElementById('object3dType').value,
+                materialColor: document.getElementById('materialColor').value,
+                detailColor: document.getElementById('detailColor3d').value,
+                resolution: document.getElementById('textureResolution').value
+            };
+            
+            console.log('3D Options:', opts);
+            
+            this.editor.clear();
+            this.state.assets = this.generators['3d'].generate(opts);
+            this.render3DAssets(this.state.assets);
+            this.updateInfo('3d (' + opts.type + ')', this.state.assets.length);
+        } catch (error) {
+            console.error('3D Generation error:', error);
+            alert('Ошибка генерации 3D: ' + error.message);
         }
-
-        class Generator3D {
-            generate(opts) {
-                const assets = [];
-                const res = parseInt(opts.resolution);
-                const views = ['top', 'front', 'side'];
-                views.forEach(view => {
-                    const c = document.createElement('canvas'); c.width = res; c.height = res;
-                    const ctx = c.getContext('2d');
-                    ctx.fillStyle = opts.materialColor; ctx.fillRect(0, 0, res, res);
-                    // Add simple 3D projection details based on view
-                    ctx.fillStyle = Utils.darkenColor(opts.materialColor, 15);
-                    if (view === 'top') {
-                        ctx.fillRect(res*0.2, res*0.2, res*0.6, res*0.6);
-                        ctx.fillStyle = opts.detailColor; ctx.fillRect(res*0.45, res*0.45, res*0.1, res*0.1);
-                    } else if (view === 'front') {
-                        ctx.fillRect(res*0.1, res*0.3, res*0.8, res*0.6);
-                        ctx.fillStyle = opts.detailColor; ctx.fillRect(res*0.4, res*0.5, res*0.2, res*0.15);
-                    } else {
-                        ctx.fillRect(res*0.3, res*0.3, res*0.4, res*0.6);
-                    }
-                    assets.push({ type: '3d_'+opts.type, view, width: res, height: res, data: ctx.getImageData(0,0,res,res) });
-                });
-                return assets;
-            }
+    }
+    
+    renderAssets(assets) {
+        console.log('Rendering assets:', assets.length);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        const cols = 4;
+        assets.forEach((asset, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            const x = col * 40 + 8;
+            const y = row * 40 + 8;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = asset.width;
+            tempCanvas.height = asset.height;
+            tempCanvas.getContext('2d').putImageData(asset.data, 0, 0);
+            
+            this.ctx.drawImage(tempCanvas, x, y);
+        });
+        
+        this.editor.saveState();
+        this.updatePreview();
+    }
+    
+    render3DAssets(assets) {
+        console.log('Rendering 3D assets:', assets.length);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        assets.forEach((asset, i) => {
+            const x = i * 140 + 10;
+            const y = 10;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = asset.width;
+            tempCanvas.height = asset.height;
+            tempCanvas.getContext('2d').putImageData(asset.data, 0, 0);
+            
+            this.ctx.drawImage(tempCanvas, x, y);
+            
+            // Label
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '12px Arial';
+            this.ctx.fillText(asset.view, x, y + asset.height + 15);
+        });
+        
+        this.editor.saveState();
+        this.updatePreview();
+    }
+    
+    updatePreview() {
+        const container = document.getElementById('previewContainer');
+        container.innerHTML = '';
+        
+        this.state.assets.forEach((asset, i) => {
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            
+            const c = document.createElement('canvas');
+            c.width = asset.width;
+            c.height = asset.height;
+            c.getContext('2d').putImageData(asset.data, 0, 0);
+            
+            const span = document.createElement('span');
+            span.textContent = asset.type + (asset.view ? ` ${asset.view}` : '');
+            
+            div.appendChild(c);
+            div.appendChild(span);
+            container.appendChild(div);
+        });
+    }
+    
+    updateInfo(type, count) {
+        document.getElementById('assetInfo').innerHTML = 
+            `<strong>Тип:</strong> ${type}<br><strong>Количество:</strong> ${count}<br><strong>Формат:</strong> PNG с прозрачностью`;
+        document.getElementById('totalAssets').textContent = count;
+    }
+    
+    drawGrid() {
+        if (!this.state.showGrid) return;
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        this.ctx.lineWidth = 1;
+        for (let x = 0; x <= 512; x += 32) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, 512);
+            this.ctx.stroke();
         }
-
-        // === MAIN APP ===
-        class RPGAssetGenerator {
-            constructor() {
-                this.canvas = document.getElementById('mainCanvas');
-                this.editor = new PixelEditor(this.canvas);
-                this.generators = {
-                    tile: new TileGenerator(),
-                    character: new CharacterGenerator(),
-                    object: new ObjectGenerator(),
-                    '3d': new Generator3D()
-                };
-                this.state = { zoom: 1, showGrid: true, assets: [] };
-                this.init();
-            }
-            init() {
-                this.editor.init();
-                this.setupUI();
-                this.setupPalette();
-                this.drawGrid();
-            }
-            setupUI() {
-                document.querySelectorAll('.tab-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                        btn.classList.add('active');
-                        document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
-                    });
-                });
-                document.querySelectorAll('.tool-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-                    });
-                });
-                document.getElementById('variantCount').addEventListener('input', e => {
-                    document.getElementById('variantValue').textContent = e.target.value;
-                });
-                document.getElementById('brushSize').addEventListener('input', e => {
-                    document.getElementById('brushSizeValue').textContent = e.target.value;
-                    this.editor.setBrushSize(parseInt(e.target.value));
-                });
-                document.getElementById('currentColor').addEventListener('input', e => {
-                    this.editor.setColor(e.target.value);
-                });
-                this.canvas.addEventListener('mousemove', e => {
-                    const pos = this.editor.getMousePos(e);
-                    document.getElementById('cursorPos').textContent = `${pos.x}, ${pos.y}`;
-                });
-            }
-            setupPalette() {
-                const colors = ['#1a1a2e', '#0f3460', '#2d5a27', '#4a7c43', '#8fbc6f', '#e94560', '#ff6b6b', '#f7d794', '#778baf', '#fff', '#000', '#8B4513'];
-                const container = document.getElementById('palette');
-                colors.forEach((c, i) => {
-                    const div = document.createElement('div');
-                    div.className = 'palette-color' + (i === 2 ? ' active' : '');
-                    div.style.backgroundColor = c;
-                    div.addEventListener('click', () => {
-                        document.querySelectorAll('.palette-color').forEach(x => x.classList.remove('active'));
-                        div.classList.add('active');
-                        this.editor.setColor(c);
-                        document.getElementById('currentColor').value = c;
-                    });
-                    container.appendChild(div);
-                });
-            }
-            generateAssets() {
-                const type = document.getElementById('assetType').value;
-                const opts = {
-                    mainColor: document.getElementById('mainColor').value,
-                    secondaryColor: document.getElementById('secondaryColor').value,
-                    count: parseInt(document.getElementById('variantCount').value),
-                    shadows: document.getElementById('addShadows').checked
-                };
-                this.editor.clear();
-                this.state.assets = this.generators[type].generate(opts);
-                this.renderAssets(this.state.assets);
-                this.updateInfo(type, this.state.assets.length);
-            }
-            generate3DObject() {
-                const opts = {
-                    type: document.getElementById('object3dType').value,
-                    materialColor: document.getElementById('materialColor').value,
-                    detailColor: document.getElementById('detailColor3d').value,
-                    resolution: document.getElementById('textureResolution').value
-                };
-                this.editor.clear();
-                this.state.assets = this.generators['3d'].generate(opts);
-                this.render3DAssets(this.state.assets);
-                this.updateInfo('3d (' + opts.type + ')', this.state.assets.length);
-            }
-            renderAssets(assets) {
-                const cols = 4;
-                assets.forEach((asset, i) => {
-                    const col = i % cols, row = Math.floor(i / cols);
-                    this.ctx.putImageData(asset.data, col * 40 + 8, row * 40 + 8);
-                });
-                this.editor.saveState();
-                this.updatePreview();
-            }
-            render3DAssets(assets) {
-                assets.forEach((asset, i) => {
-                    this.ctx.putImageData(asset.data, i * 140 + 10, 10);
-                });
-                this.editor.saveState();
-                this.updatePreview();
-            }
-            updatePreview() {
-                const container = document.getElementById('previewContainer');
-                container.innerHTML = '';
-                this.state.assets.forEach((asset, i) => {
-                    const div = document.createElement('div');
-                    div.className = 'preview-item';
-                    const c = document.createElement('canvas');
-                    c.width = asset.width; c.height = asset.height;
-                    c.getContext('2d').putImageData(asset.data, 0, 0);
-                    const span = document.createElement('span');
-                    span.textContent = asset.type + (asset.view ? ` ${asset.view}` : '');
-                    div.appendChild(c); div.appendChild(span);
-                    container.appendChild(div);
-                });
-            }
-            updateInfo(type, count) {
-                document.getElementById('assetInfo').innerHTML = `<strong>Тип:</strong> ${type}<br><strong>Количество:</strong> ${count}<br><strong>Формат:</strong> PNG с прозрачностью`;
-                document.getElementById('totalAssets').textContent = count;
-                document.getElementById('colorCount').textContent = 'Готово';
-            }
-            drawGrid() {
-                if (!this.state.showGrid) return;
-                this.ctx.strokeStyle = 'rgba(255,255,255,0.1)'; this.ctx.lineWidth = 1;
-                for (let x = 0; x <= 512; x += 32) { this.ctx.beginPath(); this.ctx.moveTo(x, 0); this.ctx.lineTo(x, 512); this.ctx.stroke(); }
-                for (let y = 0; y <= 512; y += 32) { this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(512, y); this.ctx.stroke(); }
-            }
-            toggleGrid() {
-                this.state.showGrid = !this.state.showGrid;
-                document.getElementById('gridBtn').classList.toggle('active');
-                this.editor.clear();
-                if (this.state.assets.length > 0) this.renderAssets(this.state.assets);
-                else this.drawGrid();
-            }
-            zoomIn() { this.state.zoom = Math.min(this.state.zoom * 1.2, 4); this.applyZoom(); }
-            zoomOut() { this.state.zoom = Math.max(this.state.zoom / 1.2, 0.5); this.applyZoom(); }
-            applyZoom() {
-                this.canvas.style.transform = `scale(${this.state.zoom})`;
-                document.getElementById('zoomLevel').textContent = Math.round(this.state.zoom * 100) + '%';
-            }
-            undo() { this.editor.undo(); }
-            clearCanvas() { this.editor.clear(); this.drawGrid(); this.state.assets = []; document.getElementById('previewContainer').innerHTML = ''; }
-            randomizeColors() {
-                const r = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-                document.getElementById('mainColor').value = r();
-                document.getElementById('secondaryColor').value = r();
-            }
-            exportPNG() {
-                const name = document.getElementById('fileName').value || 'assets';
-                const scale = parseInt(document.getElementById('exportScale').value);
-                if (scale > 1) {
-                    const tc = document.createElement('canvas'); tc.width = 512 * scale; tc.height = 512 * scale;
-                    const tctx = tc.getContext('2d'); tctx.imageSmoothingEnabled = false; tctx.scale(scale, scale);
-                    tctx.drawImage(this.canvas, 0, 0);
-                    this.download(tc, name + '.png');
-                } else {
-                    this.download(this.canvas, name + '.png');
-                }
-            }
-            download(canvasOrSource, filename) {
-                const link = document.createElement('a');
-                link.download = filename;
-                link.href = canvasOrSource.toDataURL ? canvasOrSource.toDataURL('image/png') : canvasOrSource;
-                link.click();
-            }
-            copyToClipboard() {
-                this.canvas.toBlob(blob => {
-                    navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(() => alert('Скопировано!'));
-                });
-            }
+        for (let y = 0; y <= 512; y += 32) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(512, y);
+            this.ctx.stroke();
         }
+    }
+    
+    toggleGrid() {
+        this.state.showGrid = !this.state.showGrid;
+        document.getElementById('gridBtn').classList.toggle('active');
+        this.editor.clear();
+        if (this.state.assets.length > 0) {
+            this.renderAssets(this.state.assets);
+        } else {
+            this.drawGrid();
+        }
+    }
+    
+    zoomIn() {
+        this.state.zoom = Math.min(this.state.zoom * 1.2, 4);
+        this.applyZoom();
+    }
+    
+    zoomOut() {
+        this.state.zoom = Math.max(this.state.zoom / 1.2, 0.5);
+        this.applyZoom();
+    }
+    
+    applyZoom() {
+        this.canvas.style.transform = `scale(${this.state.zoom})`;
+        document.getElementById('zoomLevel').textContent = Math.round(this.state.zoom * 100) + '%';
+    }
+    
+    undo() {
+        this.editor.undo();
+    }
+    
+    clearCanvas() {
+        this.editor.clear();
+        this.drawGrid();
+        this.state.assets = [];
+        document.getElementById('previewContainer').innerHTML = '';
+    }
+    
+    randomizeColors() {
+        const r = () => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+        document.getElementById('mainColor').value = r();
+        document.getElementById('secondaryColor').value = r();
+    }
+    
+    exportPNG() {
+        const name = document.getElementById('fileName').value || 'assets';
+        const scale = parseInt(document.getElementById('exportScale').value);
+        
+        if (scale > 1) {
+            const tc = document.createElement('canvas');
+            tc.width = 512 * scale;
+            tc.height = 512 * scale;
+            const tctx = tc.getContext('2d');
+            tctx.imageSmoothingEnabled = false;
+            tctx.scale(scale, scale);
+            tctx.drawImage(this.canvas, 0, 0);
+            this.download(tc, name + '.png');
+        } else {
+            this.download(this.canvas, name + '.png');
+        }
+    }
+    
+    download(canvasOrSource, filename) {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvasOrSource.toDataURL ? canvasOrSource.toDataURL('image/png') : canvasOrSource;
+        link.click();
+    }
+    
+    copyToClipboard() {
+        this.canvas.toBlob(blob => {
+            navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+                .then(() => alert('Скопировано!'))
+                .catch(err => alert('Ошибка копирования: ' + err));
+        });
+    }
+}
 
-        let app;
-        window.addEventListener('DOMContentLoaded', () => { app = new RPGAssetGenerator(); });
-    </script>
-</body>
-</html>
+let app;
+window.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing app...');
+    app = new RPGAssetGenerator();
+});
+</script>
